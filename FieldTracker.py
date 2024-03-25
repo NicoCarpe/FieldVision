@@ -4,8 +4,8 @@ from KalmanFilter import KalmanFilter  # Assuming this is your imported Kalman F
 
 def select_user_rois(frame):
     # User selects the rois in the first frame
-    rois = cv2.selectROIs("Select ROIs", frame, False, False)
-    cv2.destroyWindow("Select ROIs")
+    rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
+    cv2.destroyWindow('Select ROIs')
 
     # returns a list of tuples, each representing an roi in (x, y, w, h) format
     return rois
@@ -13,7 +13,9 @@ def select_user_rois(frame):
     
 def create_mask_and_hist(frame, x, y, w, h):
     # extract roi
-    roi = frame[x:x+w, y:y+h]
+    roi = frame[y:y+h, x:x+w]
+    # show roi
+    cv2.imshow('ROI', roi)
 
     # roi converted from BGR to the HSV (Hue, Saturation, Value) color space
     hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
@@ -99,8 +101,10 @@ def main():
         print("Failed to read video")
         return
 
+    # for the first frame the user selects the ROIs
     rois = select_user_rois(frame)
-    roi_hists = [create_mask_and_hist(frame, roi) for roi in rois]
+    print("Selected ROIs:", rois)
+    roi_hists = [create_mask_and_hist(frame, roi[0], roi[1], roi[2], roi[3]) for roi in rois]
     kalman_filters = [KalmanFilter() for _ in rois]  # initialize a Kalman Filter for each ROI
 
     # set up the termination criteria:
