@@ -2,6 +2,9 @@ import cv2
 import numpy as np
 from KalmanFilter import KalmanFilter  # Assuming this is your imported Kalman Filter class
 
+
+KF = KalmanFilter(0.1, 1, 1, 1, 0.1, 0.1)
+
 def select_user_rois(frame):
     # User selects the rois in the first frame
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
@@ -68,6 +71,11 @@ def track_objects(frame, roi_hists, kalman_filters, term_crit):
     """
 
     for i, roi_hist in enumerate(roi_hists):
+        frame_copy = frame.copy()
+
+        # Gaussian blur to reduce noise
+        frame = cv2.GaussianBlur(frame, (5, 5), 0)
+
         # convert frame to HSV and back-project the histogram to get a probability map
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         dst = cv2.calcBackProject([hsv], [0], roi_hist, [0, 180], 1)
@@ -83,7 +91,7 @@ def track_objects(frame, roi_hists, kalman_filters, term_crit):
         x, y, w, h = track_window
 
         # draw the tracked object position on the image
-        img2 = cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        img2 = cv2.rectangle(frame_copy, (x, y), (x+w, y+h), (0, 255, 0), 2)
         cv2.imshow('Tracking', img2)
 
         # update Kalman Filter with the new measurement
@@ -105,7 +113,7 @@ def main():
     rois = select_user_rois(frame)
     print("Selected ROIs:", rois)
     roi_hists = [create_mask_and_hist(frame, roi[0], roi[1], roi[2], roi[3]) for roi in rois]
-    kalman_filters = [KalmanFilter() for _ in rois]  # initialize a Kalman Filter for each ROI
+    kalman_filters = [KF for _ in rois]  # initialize a Kalman Filter for each ROI
 
     # set up the termination criteria:
     # TERM_CRITERIA_EPS: 
