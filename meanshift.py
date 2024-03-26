@@ -49,7 +49,8 @@ while True:
     
     # Apply background subtraction
     fgMask = backSub.apply(frame)
-    fgMask = cv2.GaussianBlur(fgMask, (5, 5), 0)
+    # fgMask = cv2.GaussianBlur(fgMask, (5, 5), 0)
+    fgMask = cv2.medianBlur(fgMask, 3)
     _, fgMask = cv2.threshold(fgMask, 230, 255, 0)
 
     # Convert BGR to HSV format COLOR_BGR2HSV
@@ -74,7 +75,12 @@ while True:
         # Draw track window on the frame
         x, y, w, h = track_windows[i]
         vid = cv2.rectangle(frame, (x, y), (x + w, y + h), 255, 2)
-        players[i] = [x + w//2, y +h]
+
+        # only update if movement is significant
+        distance = np.sqrt((x + w//2 - players[i][0])**2 + (y + h - players[i][1])**2)
+        if distance > 3:
+            players[i] = [x + w//2, y +h]
+
         vid = cv2.circle(vid, (players[i][0], players[i][1]), 5, (0, 0, 255), -1)
 
     # Show results
