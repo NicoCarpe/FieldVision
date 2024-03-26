@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from DLT import select_points, estimate_homography, apply_homography
 
 # Function to initialize MeanShift tracking with user-selected ROI
 def select_user_rois(frame):
@@ -22,6 +23,13 @@ track_windows = select_user_rois(frame)
 if track_windows is None:
     print("No ROI selected. Exiting.")
     exit()
+
+
+tennis_court = cv2.imread('./assets/tennis_court_background.png')
+
+num_points = 4
+pst1 = select_points(frame, num_points)
+pst2 = select_points(tennis_court, num_points)
 
 # Termination criteria, either 15 iteration or by at least 2 pt
 termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 15, 2)
