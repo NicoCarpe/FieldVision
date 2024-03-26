@@ -92,7 +92,8 @@ def track_objects(frame, roi_hists, kalman_filters, term_crit):
 
         # draw the tracked object position on the image
         img2 = cv2.rectangle(frame_copy, (x, y), (x+w, y+h), (0, 255, 0), 2)
-        cv2.imshow('Tracking', img2)
+        resized_img = cv2.resize(img2, (img2.shape[1]//2, img2.shape[0]//2))
+        cv2.imshow('Tracking', resized_img)
 
         # update Kalman Filter with the new measurement
         # the measurement is the center of the tracked window

@@ -1,3 +1,4 @@
+from time import sleep
 import cv2
 import numpy as np
 
@@ -22,10 +23,11 @@ def select_roi(event, x, y, flags, param):
         roi_selected = True
 
 # Read video
-cap = cv2.VideoCapture('field_map.mp4')
+cap = cv2.VideoCapture("video_1.mp4")
 
 # Retrieve the very first frame from the video
 _, frame = cap.read()
+frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
 frame_copy = frame.copy()
 
 # Variables to store ROI coordinates and flags
@@ -48,44 +50,45 @@ cv2.destroyWindow('Select ROI')
 # Set the region for the tracking window based on the selected ROI
 track_window = (p, q, r, s)
 
-# Create the region of interest
-r_o_i = frame[q:q + s, p:p + r]
-
-# Convert BGR to HSV format for ROI
-hsv_roi = cv2.cvtColor(r_o_i, cv2.COLOR_BGR2HSV)
-
-# Apply mask on the HSV ROI
-mask = cv2.inRange(hsv_roi, np.array((0., 61., 33.)), np.array((180., 255., 255.)))
-
-# Get histogram for hsv channel of ROI
-roi_hist = cv2.calcHist([hsv_roi], [0], mask, [180], [0, 180])
-
-# Normalize the retrieved values for ROI
-cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
-
 # Termination criteria, either 15 iteration or by at least 2 pt
 termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 15, 2)
 
+# Background subtractor
+backSub = cv2.createBackgroundSubtractorKNN()
+
 while True:
     _, frame = cap.read()
-
+    frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
     if frame is None:
         break
+    frame_copy = frame.copy()
     
-    # add gaussian blur to frame
-    # frame = cv2.GaussianBlur(frame, (15, 15), 0)
+    # Apply background subtraction
+    fgMask = backSub.apply(frame)
+    _, fgMask = cv2.threshold(fgMask, 250, 255, 0)
 
-    # Convert BGR to HSV format
+    # Convert BGR to HSV format COLOR_BGR2HSV
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # crop out the field
+    field_mask = np.zeros_like(fgMask)
+    points = np.array([[360, 130], [360, 1000], [1500, 1000], [1500, 130]])
+    points = points // 2
+    cv2.fillPoly(field_mask, [points], color=(255, 255, 255))   
     
-    bp = cv2.calcBackProject([hsv], [0], roi_hist, [0, 180], 1)
+    field = cv2.bitwise_and(field_mask, fgMask)
+    
+    # debug
+    show = field # cv2.resize(field, (frame.shape[1]//2, frame.shape[0]//2))
+    cv2.imshow('dst', show)
+    # sleep(5)
 
     # Applying meanshift to get the new region
-    _, track_window = cv2.meanShift(bp, track_window, termination)
+    _, track_window = cv2.meanShift(field, track_window, termination)
 
     # Draw track window on the frame
     x, y, w, h = track_window
-    vid = cv2.rectangle(frame, (x, y), (x + w, y + h), 255, 2)
+    vid = cv2.rectangle(frame_copy, (x, y), (x + w, y + h), 255, 2)
 
     # Show results
     cv2.imshow('Tracker', vid)
