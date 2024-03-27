@@ -211,6 +211,20 @@ def main():
 
     frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
 
+    # create a mask for the tennis field
+    field_mask = np.zeros_like(frame)
+    field = select_points(frame)
+    points = np.array([field[0], field[3], field[2], field[1]])
+    cv2.fillPoly(field_mask, [points], color=(255, 255, 255))
+    outside_field_mask = cv2.bitwise_not(field_mask)
+    # # Fill the frame outside the field with black
+
+    midpoint = (field[0] + field[2]) // 2
+    field_color = frame[midpoint[1]-10, midpoint[0]-10]
+    frame[outside_field_mask == 255] = 0
+    indices = np.all(frame == [0, 0, 0], axis=-1)
+    frame[indices] = field_color
+
     # interactive HSV mask adjustment
     s_lower, s_upper, v_lower, v_upper = adjust_hsv_mask(frame)
 
@@ -237,6 +251,7 @@ def main():
             break
 
         frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+        frame[indices] = field_color
         
         # calculate histograms for ROI
         roi_hists = calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper)
