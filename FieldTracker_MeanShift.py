@@ -70,14 +70,14 @@ def tracking_with_meanshift(rois, frame, termination, roi_hists):
     
     for i, roi in enumerate(rois):
         roi_hist = roi_hists[i]
-        # Backproject the histogram to find pixels with similar hues
+        # Backproject the histogram to find pixels with similar húes
         img_bp = cv2.calcBackProject(
                     [img_hsv], 
                     [0, 1], 
                     roi_hist, 
                     [0, 180, 0, 255],
                     1)
-        
+
         # Apply MeanShift
         ret, new_roi = cv2.meanShift(img_bp, roi, termination)
         rois[i] = new_roi
@@ -89,6 +89,15 @@ def tracking_with_meanshift(rois, frame, termination, roi_hists):
                               (x + w, y + h),
                               (255, 0, 0),
                               2)
+        
+        # debuging
+        img_bp = cv2.rectangle(img_bp,
+                              (x, y),
+                              (x + w, y + h),
+                              (255, 0, 0),
+                              2)
+        # show backprojection image
+        cv2.imshow("Backprojection", img_bp)
         
         # extract player position
         player = np.array([x + w / 2, y + h], np.float32)
@@ -105,14 +114,27 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
     cv2.imshow('Radar', radar)
 
 def main():
-    cap = cv2.VideoCapture("./assets/doubles_clip.mp4")
+    cap = cv2.VideoCapture(0) # "./assets/singles_1.mp4"
     ret, frame = cap.read()
     if not ret:
         print("Failed to grab initial frame. Exiting.")
         exit()
 
     frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
-    
+
+    # median blur to reduce noise
+    # frame = cv2.medianBlur(frame, 5)
+
+    # create a mask for the tennis field
+    field_mask = np.zeros_like(frame)
+    field = select_points(frame)
+    points = np.array([field[0], field[3], field[2], field[1]])
+    cv2.fillPoly(field_mask, [points], color=(255, 255, 255))
+    outside_field_mask = cv2.bitwise_not(field_mask)
+
+    # Fill the frame outside the field with black
+    frame[outside_field_mask == 255] = 0
+
     # interactive HSV mask adjustment
     s_lower, s_upper, v_lower, v_upper = adjust_hsv_mask(frame)
 
@@ -125,7 +147,7 @@ def main():
     tennis_court = cv2.resize(tennis_court, (tennis_court.shape[1] // 6, tennis_court.shape[0] // 6))
     
     src_pts = select_points(frame, 4)
-    dst_pts = select_points(tennis_court, 4)
+    dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
     
     termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 5)

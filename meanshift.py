@@ -12,7 +12,7 @@ def select_user_rois(frame):
     return rois
 
 # Read video
-cap = cv2.VideoCapture("video_1.mp4")
+cap = cv2.VideoCapture("./assets/singles_2.mp4")
 
 # Retrieve the very first frame from the video
 _, frame = cap.read()
@@ -97,8 +97,6 @@ while True:
     if k == ord('q') or k == 27:  # Quit on 'q' or Esc key
         break
 
-# Release cap object
 cap.release()
 
-# Destroy all opened windows
 cv2.destroyAllWindows()

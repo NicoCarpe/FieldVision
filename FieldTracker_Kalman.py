@@ -223,7 +223,7 @@ def main():
     tennis_court = cv2.resize(tennis_court, (tennis_court.shape[1] // 6, tennis_court.shape[0] // 6))
     
     src_pts = select_points(frame, 4)
-    dst_pts = select_points(tennis_court, 4)
+    dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
     
     termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 25, 5)
@@ -240,8 +240,6 @@ def main():
         
         # calculate histograms for ROI
         roi_hists = calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper)
-
-        
 
         rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, last_positions, dt)
         

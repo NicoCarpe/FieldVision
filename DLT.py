@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-def select_points(image, num_points):
+def select_points(image, num_points=4):
     """
     Function to allow the user to select points on an image.
     """
