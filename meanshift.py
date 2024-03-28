@@ -12,7 +12,7 @@ def select_user_rois(frame):
     return rois
 
 # Read video
-cap = cv2.VideoCapture("./assets/singles_2.mp4")
+cap = cv2.VideoCapture("./assets/singles_1.mp4") # "./assets/singles_1.mp4"
 
 # Retrieve the very first frame from the video
 _, frame = cap.read()
@@ -41,12 +41,18 @@ backSub = cv2.createBackgroundSubtractorKNN()
 
 players = [[0,0], [0,0]]
 
+# save video as mp4
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter('output.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+out_debug = cv2.VideoWriter('output_debug.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+out_radar = cv2.VideoWriter('output_radar.mp4', fourcc, 30.0, (tennis_court.shape[1], tennis_court.shape[0]))
+
 while True:
     _, frame = cap.read()
-    frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
     if frame is None:
         break
     
+    frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
     # Apply background subtraction
     fgMask = backSub.apply(frame)
     fgMask = cv2.GaussianBlur(fgMask, (5, 5), 0)
@@ -62,14 +68,18 @@ while True:
     cv2.fillPoly(field_mask, [points], color=(255, 255, 255))   
     
     field = cv2.bitwise_and(field_mask, fgMask)
+    # dilate the field
+    field = cv2.dilate(field, None, iterations=2)
 
     # debug
     show = field # cv2.resize(field, (frame.shape[1]//2, frame.shape[0]//2))
+    show = cv2.cvtColor(show, cv2.COLOR_GRAY2BGR)
     cv2.imshow('dst', show)
+    out_debug.write(show)
 
     # Applying meanshift to get the new region
     for i, track_window in enumerate(track_windows):
-        _, track_windows[i] = cv2.CamShift(field, track_window, termination) # meanshift
+        _, track_windows[i] = cv2.meanShift(field, track_window, termination) # meanshift
 
         # Draw track window on the frame
         x, y, w, h = track_windows[i]
@@ -79,6 +89,7 @@ while True:
 
     # Show results
     cv2.imshow('Tracker', vid)
+    # out.write(vid)
 
     # warped_image = apply_homography(vid, H)
 
@@ -91,12 +102,31 @@ while True:
         x, y = point
         radar = cv2.circle(radar, (int(x), int(y)), 5, (0, 0, 255), -1)
     
+    out_radar.write(radar)
+    
     cv2.imshow('Radar', radar)
 
     k = cv2.waitKey(10)
     if k == ord('q') or k == 27:  # Quit on 'q' or Esc key
         break
 
+    # minimize the radar to fit the video
+    radar = cv2.resize(radar, (radar.shape[1]//2, radar.shape[0]//2))
+    # overlay the radar on the video
+    vid[0:radar.shape[0], 0:radar.shape[1]] = radar
+
+    # minimize the debug screen to fit the video
+    show = cv2.resize(show, (show.shape[1]//5, show.shape[0]//5))
+    # overlay the debug screen on the video
+    vid[0:show.shape[0], show.shape[1]:2*show.shape[1]] = show
+
+    out.write(vid)
+
+
+
 cap.release()
+out.release()
+out_debug.release()
+out_radar.release()
 
 cv2.destroyAllWindows()

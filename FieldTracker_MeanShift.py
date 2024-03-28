@@ -91,20 +91,20 @@ def tracking_with_meanshift(rois, frame, termination, roi_hists):
                               2)
         
         # debuging
-        img_bp = cv2.rectangle(img_bp,
+        img_bp_show = cv2.rectangle(img_bp,
                               (x, y),
                               (x + w, y + h),
                               (255, 0, 0),
                               2)
         # show backprojection image
-        cv2.imshow("Backprojection", img_bp)
+        cv2.imshow("Backprojection", img_bp_show)
         
         # extract player position
         player = np.array([x + w / 2, y + h], np.float32)
         players.append(player)
 
     cv2.imshow("Tracking Window", frame)
-    return rois, players
+    return rois, players, cv2.cvtColor(img_bp_show, cv2.COLOR_GRAY2BGR)
 
 def transform_and_draw_points_on_court(players, H, tennis_court):
     new_points = cv2.perspectiveTransform(np.array([players], dtype=np.float32), H)
@@ -113,8 +113,10 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
         cv2.circle(radar, (int(x), int(y)), 5, (0, 0, 255), -1)
     cv2.imshow('Radar', radar)
 
+    return radar
+
 def main():
-    cap = cv2.VideoCapture("./assets/singles_2.mp4") # ""
+    cap = cv2.VideoCapture("./assets/singles_1.mp4") # ""
     ret, frame = cap.read()
     if not ret:
         print("Failed to grab initial frame. Exiting.")
@@ -137,7 +139,6 @@ def main():
     indices = np.all(frame == [0, 0, 0], axis=-1)
     frame[indices] = field_color
 
-
     # interactive HSV mask adjustment
     s_lower, s_upper, v_lower, v_upper = adjust_hsv_mask(frame)
 
@@ -155,6 +156,11 @@ def main():
     
     termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 5)
     
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter('output.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+    out_debug = cv2.VideoWriter('output_debug.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+    out_radar = cv2.VideoWriter('output_radar.mp4', fourcc, 30.0, (tennis_court.shape[1], tennis_court.shape[0]))
+
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -166,12 +172,24 @@ def main():
         # calculate histograms for ROI
         roi_hists = calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper)
     
-        rois, players = tracking_with_meanshift(rois, frame, termination, roi_hists)
+        rois, players, debug_show = tracking_with_meanshift(rois, frame, termination, roi_hists)
         
-        transform_and_draw_points_on_court(players, H, tennis_court)
+        radar = transform_and_draw_points_on_court(players, H, tennis_court)
         
         if cv2.waitKey(10) == 27:  # Esc key to quit
             break
+
+        # minimize the radar to fit the video
+        radar = cv2.resize(radar, (radar.shape[1]//2, radar.shape[0]//2))
+        # overlay the radar on the video
+        frame[0:radar.shape[0], 0:radar.shape[1]] = radar
+
+        # minimize the debug screen to fit the video
+        debug_show = cv2.resize(debug_show, (debug_show.shape[1]//5, debug_show.shape[0]//5))
+        # overlay the debug screen on the video
+        frame[0:debug_show.shape[0], debug_show.shape[1]:2*debug_show.shape[1]] = debug_show
+
+        out.write(frame)
     
     cap.release()
     cv2.destroyAllWindows()
