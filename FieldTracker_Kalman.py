@@ -72,8 +72,8 @@ def initialize_kalman_filters(rois, dt):
         x, y, w, h = roi
 
         # Extract the center of the ROI as the initial position
-        initial_x = x - w / 2  
-        initial_y = y - h / 2  
+        initial_x = x + w / 2  
+        initial_y = y + h / 2  
 
         # Assuming initial velocities (vx, vy) and accelerations (ax, ay) are zero
         initial_vx = 0
@@ -100,17 +100,25 @@ def initialize_kalman_filters(rois, dt):
 
         # Process noise covariance (Q)
         # Adjust these values based on the expected level of noise in your system
-        kf.processNoiseCov = np.eye(6, dtype=np.float32) * 0.05
+        kf.processNoiseCov = np.array([[0.1, 0, 0, 0, 0, 0],
+                                       [0, 0.1, 0, 0, 0, 0],
+                                       [0, 0, 0.1, 0, 0, 0],
+                                       [0, 0, 0, 0.1, 0, 0],
+                                       [0, 0, 0, 0, 1, 0],
+                                       [0, 0, 0, 0, 0, 1]], np.float32)
 
         # Measurement noise covariance (R)
-        kf.measurementNoiseCov = np.eye(4, dtype=np.float32) * 1  # Adjust based on measurement noise
-
+        kf.measurementNoiseCov = np.array([[0.1, 0, 0, 0],
+                                           [0, 0.1, 0, 0],
+                                           [0, 0, 1, 0],
+                                           [0, 0, 0, 1]], np.float32)  
+        
         # Initial state estimation error covariance (P)
-        kf.errorCovPost = np.eye(6, dtype=np.float32)
-
+        kf.errorCovPost = np.eye(6, dtype=np.float32) 
+        
         # Initialize the state vector (x)
         kf.statePost = np.array([initial_x, initial_y, initial_vx, initial_vy, initial_ax, initial_ay], np.float32)
-
+        
         kalman_filters.append(kf)
 
     return kalman_filters
@@ -135,30 +143,36 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         kf = kalman_filters[i]
         roi_hist = roi_hists[i]
 
-        # backproject the histogram to find pixels with similar hues
-        img_bp = cv2.calcBackProject(
-                    [img_hsv], 
-                    [0, 1], 
-                    roi_hist, 
-                    [0, 180, 0, 255],
-                    1)
+        # Prediction using Kalman filter
+        prediction = kf.predict()
+        
+        # Update ROI based on prediction for Meanshift initialization
+        pred_x, pred_y = int(prediction[0]), int(prediction[1])
+        roi = (pred_x - roi[2] // 2, pred_y - roi[3] // 2, roi[2], roi[3])
 
-        # apply MeanShift
+        img_bp = cv2.calcBackProject([img_hsv], [0, 1], roi_hist, [0, 180, 0, 255], 1)
+
+        # Apply Meanshift using updated ROI
         ret, new_roi = cv2.meanShift(img_bp, roi, termination)
         rois[i] = new_roi
         x, y, w, h = new_roi
+        center = np.array([x + (w / 2), y + (h / 2)], np.float32)
 
-        # extract centre of this new_roi
-        center = np.array([x + w / 2, y + h / 2], np.float32)
-
-        # store the new position for the next frame's velocity calculation
+        # store player positions (we want the marker to be at the bottom of their feet)
+        players.append((int(center[0]), int(center[1]) + (h / 2)))
         new_last_positions.append(center)
 
-        # if there was a position in the last frame, calculate velocity
+        # Calculate velocity for Kalman filter measurement update
         if last_positions and len(last_positions) > i:
             vx, vy = calculate_velocity(center, last_positions[i], dt)
         else:
-            vx, vy = 0, 0  # no velocity if it's the first frame
+            vx, vy = 0, 0  # No velocity if it's the first frame
+
+        measurement = np.array([center[0], center[1], vx, vy], np.float32)
+        
+        # Correct the Kalman filter with the new measurement
+        kf.correct(measurement.reshape(-1, 1))
+
 
         # draw new_roi on image - in BLUE
         frame = cv2.rectangle(frame,
@@ -167,13 +181,13 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
                               (255, 0, 0),
                               2)      
 
-        measurement = np.array([center[0], center[1], vx, vy], np.float32)
-        
-        # correct the kalman filter
-        kf.correct(measurement.reshape(-1, 1))
-
-        # get new kalman filter prediction
-        prediction = kf.predict()
+        # debuging
+        img_bp_show = cv2.rectangle(img_bp,
+                              (x, y),
+                              (x + w, y + h),
+                              (255, 0, 0),
+                              2)
+        cv2.imshow("Backprojection", img_bp_show)
 
         # draw predicton on image - in GREEN
         frame = cv2.rectangle(frame,
@@ -183,13 +197,10 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
                               int(prediction[1][0] + (0.5 * h))),
                              (0, 255, 0),
                               2)
-        
-        # store player positions (we want the marker to be at the bottom of their feet)
-        players.append((int(prediction[0][0]), int(prediction[1][0] + (0.5 * h))))
-
+    
     cv2.imshow("Tracking Window", frame)
     
-    return rois, players
+    return rois, players, cv2.cvtColor(img_bp_show, cv2.COLOR_GRAY2BGR)
 
 
 def transform_and_draw_points_on_court(players, H, tennis_court):
@@ -199,6 +210,7 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
         cv2.circle(radar, (int(x), int(y)), 5, (0, 0, 255), -1)
     cv2.imshow('Radar', radar)
 
+    return radar
 
 def main():
     fps = 60
@@ -240,8 +252,14 @@ def main():
     dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
     
-    termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 25, 5)
+    # possibly look at interatively increasing the search window if there is poor matching
+    # or implementing a pyramidal update on top
+    termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 50, 1)
     
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter('output_kalman.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
+
+
     kalman_filters = initialize_kalman_filters(rois, fps)
     
     last_positions = [] 
@@ -256,13 +274,26 @@ def main():
         # calculate histograms for ROI
         roi_hists = calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper)
 
-        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, last_positions, dt)
+        rois, players, debug_show = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, last_positions, dt)
         
-        transform_and_draw_points_on_court(players, H, tennis_court)
+        radar = transform_and_draw_points_on_court(players, H, tennis_court)
         
+        # minimize the radar to fit the video
+        radar = cv2.resize(radar, (radar.shape[1]//2, radar.shape[0]//2))
+        # overlay the radar on the video
+        frame[0:radar.shape[0], 0:radar.shape[1]] = radar
+
+        # minimize the debug screen to fit the video
+        debug_show = cv2.resize(debug_show, (debug_show.shape[1]//5, debug_show.shape[0]//5))
+        # overlay the debug screen on the video
+        frame[0:debug_show.shape[0], debug_show.shape[1]:2*debug_show.shape[1]] = debug_show
+
+        out.write(frame)
+
         if cv2.waitKey(10) == 27:  # Esc key to quit
             break
     
+    out.release()
     cap.release()
     cv2.destroyAllWindows()
 

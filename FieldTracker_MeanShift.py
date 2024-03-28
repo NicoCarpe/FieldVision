@@ -116,7 +116,7 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
     return radar
 
 def main():
-    cap = cv2.VideoCapture("./assets/singles_1.mp4") # ""
+    cap = cv2.VideoCapture("./assets/doubles_clip.mp4") # ""
     ret, frame = cap.read()
     if not ret:
         print("Failed to grab initial frame. Exiting.")
@@ -158,9 +158,7 @@ def main():
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter('output.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
-    out_debug = cv2.VideoWriter('output_debug.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
-    out_radar = cv2.VideoWriter('output_radar.mp4', fourcc, 30.0, (tennis_court.shape[1], tennis_court.shape[0]))
-
+    
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -191,6 +189,7 @@ def main():
 
         out.write(frame)
     
+    out.release()
     cap.release()
     cv2.destroyAllWindows()
 
