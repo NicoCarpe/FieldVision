@@ -72,8 +72,8 @@ def initialize_kalman_filters(rois, dt):
         x, y, w, h = roi
 
         # Extract the center of the ROI as the initial position
-        initial_x = x + w / 2  
-        initial_y = y + h / 2  
+        initial_x = x - w / 2  
+        initial_y = y - h / 2  
 
         # Assuming initial velocities (vx, vy) and accelerations (ax, ay) are zero
         initial_vx = 0
@@ -100,7 +100,7 @@ def initialize_kalman_filters(rois, dt):
 
         # Process noise covariance (Q)
         # Adjust these values based on the expected level of noise in your system
-        kf.processNoiseCov = np.eye(6, dtype=np.float32) * 0.005
+        kf.processNoiseCov = np.eye(6, dtype=np.float32) * 0.05
 
         # Measurement noise covariance (R)
         kf.measurementNoiseCov = np.eye(4, dtype=np.float32) * 1  # Adjust based on measurement noise
