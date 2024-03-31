@@ -6,7 +6,7 @@ This project presents an object-tracking system designed for mapping and monitor
 
 ### Key Features
 
-- **Robust Tracking with Meanshift:** The Meanshift algorithm provides non-parametric, feature-based tracking, focusing reliably on players even in densely populated scenes.
+- **Tracking with Meanshift:** The Meanshift algorithm provides non-parametric, feature-based tracking, focusing reliably on players even in densely populated scenes.
 - **Occlusion Handling with Kalman Filter:** The Kalman Filter plays a crucial role in maintaining tracking continuity by predicting player positions during occlusions or when players momentarily disappear from view, ensuring consistent tracking performance.
 - **Spatial Mapping via DLT:** Direct Linear Transformation accurately maps 2D player positions onto a top-down view of the field, offering a clear perspective for tactical analysis.
 
@@ -14,4 +14,4 @@ This project presents an object-tracking system designed for mapping and monitor
 ![Meanshift + Kalman filter tracking of doubles tennis.](result_picture.png)
 
 ## Sources
-- Salhi, A., & Yengui Jammoussi, A. (2012). Object tracking system using Camshift, Meanshift and Kalman filter. International Journal of Electronics and Communication Engineering, 6(4). World Academy of Science, Engineering and Technology.
+- Salhi, A., & Yengui Jammoussi, A. (2012). Object tracking system using Camshift, Meanshift, and Kalman filter. International Journal of Electronics and Communication Engineering, 6(4). World Academy of Science, Engineering and Technology.
