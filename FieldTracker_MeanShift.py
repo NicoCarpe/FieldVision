@@ -8,19 +8,23 @@ def adjust_hsv_mask(frame):
         pass
 
     cv2.namedWindow('Adjust HSV Mask')
+    cv2.createTrackbar('H Lower', 'Adjust HSV Mask', 0, 180, nothing)
+    cv2.createTrackbar('H Upper', 'Adjust HSV Mask', 180, 180, nothing)
     cv2.createTrackbar('S Lower', 'Adjust HSV Mask', 0, 255, nothing)
     cv2.createTrackbar('S Upper', 'Adjust HSV Mask', 255, 255, nothing)
     cv2.createTrackbar('V Lower', 'Adjust HSV Mask', 0, 255, nothing)
     cv2.createTrackbar('V Upper', 'Adjust HSV Mask', 255, 255, nothing)
 
     while True:
+        h_lower = cv2.getTrackbarPos('H Lower', 'Adjust HSV Mask')
+        h_upper = cv2.getTrackbarPos('H Upper', 'Adjust HSV Mask')
         s_lower = cv2.getTrackbarPos('S Lower', 'Adjust HSV Mask')
         s_upper = cv2.getTrackbarPos('S Upper', 'Adjust HSV Mask')
         v_lower = cv2.getTrackbarPos('V Lower', 'Adjust HSV Mask')
         v_upper = cv2.getTrackbarPos('V Upper', 'Adjust HSV Mask')
 
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, (0, s_lower, v_lower), (180, s_upper, v_upper))
+        mask = cv2.inRange(hsv, (h_lower, s_lower, v_lower), (h_upper, s_upper, v_upper))
         cv2.imshow('Adjust HSV Mask', mask)
 
         if cv2.waitKey(10) == 27:  # Esc key to quit
@@ -116,7 +120,7 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
     return radar
 
 def main():
-    cap = cv2.VideoCapture("./assets/doubles_clip.mp4") # ""
+    cap = cv2.VideoCapture(0) # "./assets/doubles_clip.mp4"
     ret, frame = cap.read()
     if not ret:
         print("Failed to grab initial frame. Exiting.")
