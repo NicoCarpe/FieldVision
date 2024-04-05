@@ -31,10 +31,12 @@ def adjust_hsv_mask(frame):
             break
 
     cv2.destroyWindow('Adjust HSV Mask')
-    return s_lower, s_upper, v_lower, v_upper
+    lower_hsv = np.array((h_lower, s_lower, v_lower))
+    upper_hsv = np.array((h_upper, s_upper, v_upper))
+    return lower_hsv, upper_hsv
 
 
-def calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper):
+def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     roi_hists = []
     for roi in rois:
@@ -45,9 +47,7 @@ def calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper):
         hsv_roi = hsv[y:y+h, x:x+w]
 
         # apply mask with all h values and user-defined s and v thresholds
-        mask = cv2.inRange(hsv_roi,
-                           np.array((0., float(s_lower), float(v_lower))),
-                           np.array((180., float(s_upper), float(v_upper))))
+        mask = cv2.inRange(hsv_roi, lower_hsv, upper_hsv)
 
         # construct a histogram of hue and saturation values and normalize it
         roi_hist = cv2.calcHist([hsv_roi],
@@ -120,7 +120,7 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
     return radar
 
 def main():
-    cap = cv2.VideoCapture(0) # "./assets/doubles_clip.mp4"
+    cap = cv2.VideoCapture("./assets/singles_1.mp4") # "./assets/doubles_clip.mp4"
     ret, frame = cap.read()
     if not ret:
         print("Failed to grab initial frame. Exiting.")
@@ -144,7 +144,7 @@ def main():
     frame[indices] = field_color
 
     # interactive HSV mask adjustment
-    s_lower, s_upper, v_lower, v_upper = adjust_hsv_mask(frame)
+    lower_hsv, upper_hsv = adjust_hsv_mask(frame)
 
     rois = select_user_rois(frame)
     if len(rois) == 0:
@@ -172,7 +172,7 @@ def main():
         frame[indices] = field_color
 
         # calculate histograms for ROI
-        roi_hists = calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper)
+        roi_hists = calc_histogram_rois(frame, rois, lower_hsv, upper_hsv)
     
         rois, players, debug_show = tracking_with_meanshift(rois, frame, termination, roi_hists)
         
