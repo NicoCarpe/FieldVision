@@ -267,6 +267,8 @@ def main():
     kalman_filters = initialize_kalman_filters(rois, fps)
     
     last_positions = [] 
+    # calculate histograms for ROI
+    roi_hists = calc_histogram_rois(frame, rois, lower_hsv, upper_hsv)
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -274,9 +276,6 @@ def main():
 
         frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
         frame[indices] = field_color
-        
-        # calculate histograms for ROI
-        roi_hists = calc_histogram_rois(frame, rois, lower_hsv, upper_hsv)
 
         rois, players, debug_show = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, last_positions, dt)
         

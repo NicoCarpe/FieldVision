@@ -163,6 +163,9 @@ def main():
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter('output.mp4', fourcc, 30.0, (frame.shape[1], frame.shape[0]))
     
+    # calculate histograms for ROI
+    roi_hists = calc_histogram_rois(frame, rois, lower_hsv, upper_hsv)
+    
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -170,9 +173,6 @@ def main():
         
         frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
         frame[indices] = field_color
-
-        # calculate histograms for ROI
-        roi_hists = calc_histogram_rois(frame, rois, lower_hsv, upper_hsv)
     
         rois, players, debug_show = tracking_with_meanshift(rois, frame, termination, roi_hists)
         

@@ -39,12 +39,14 @@ def adjust_hsv_mask(frame):
     upper_hsv = np.array((h_upper, s_upper, v_upper))
     return lower_hsv, upper_hsv
 
-cap = cv2.VideoCapture("./assets/singles_1.mp4") # "./assets/doubles_clip.mp4"
+to_track = "./assets/singles_1.mp4" # "./assets/singles_1.mp4"
+cap = cv2.VideoCapture(to_track) 
 
 # take first frame of the video
 ret, frame = cap.read()
 # resize
-frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+if to_track:
+    frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
 
 track_window = select_user_rois(frame)
 x, y, w, h = track_window 
@@ -66,7 +68,8 @@ term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
 
 while(1):
     ret, frame = cap.read()
-    frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+    if to_track:
+        frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
 
     if ret == True:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -78,8 +81,8 @@ while(1):
 
         # Draw it on image
         x,y,w,h = track_window
-        img2 = cv2.rectangle(frame, (x,y), (x+w,y+h), 255,2)
-        cv2.imshow('img2',img2)
+        img2 = cv2.rectangle(frame, (x,y), (x+w,y+h), 255, 2)
+        cv2.imshow('img2', img2)
 
         k = cv2.waitKey(30) & 0xff
         if k == 27:
