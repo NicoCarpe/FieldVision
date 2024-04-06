@@ -3,3 +3,5 @@
 __pycache__/
 test*.py
 *.mp4
+!singles*.mp4
+!doubles_clip.mp4

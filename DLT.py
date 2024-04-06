@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-def select_points(image, num_points):
+def select_points(image, num_points=4):
     """
     Function to allow the user to select points on an image.
     """
@@ -10,7 +10,7 @@ def select_points(image, num_points):
     def mouse_callback(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             points.append((x, y))
-            cv2.circle(image, (x, y), 5, (0, 0, 255), -1)
+            cv2.circle(image, (x, y), 5, (0, 255, 0), -1)
             cv2.imshow('Image', image)
 
     cv2.imshow('Image', image)
