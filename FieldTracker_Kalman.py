@@ -8,29 +8,35 @@ def adjust_hsv_mask(frame):
         pass
 
     cv2.namedWindow('Adjust HSV Mask')
+    cv2.createTrackbar('H Lower', 'Adjust HSV Mask', 0, 180, nothing)
+    cv2.createTrackbar('H Upper', 'Adjust HSV Mask', 180, 180, nothing)
     cv2.createTrackbar('S Lower', 'Adjust HSV Mask', 0, 255, nothing)
     cv2.createTrackbar('S Upper', 'Adjust HSV Mask', 255, 255, nothing)
     cv2.createTrackbar('V Lower', 'Adjust HSV Mask', 0, 255, nothing)
     cv2.createTrackbar('V Upper', 'Adjust HSV Mask', 255, 255, nothing)
 
     while True:
+        h_lower = cv2.getTrackbarPos('H Lower', 'Adjust HSV Mask')
+        h_upper = cv2.getTrackbarPos('H Upper', 'Adjust HSV Mask')
         s_lower = cv2.getTrackbarPos('S Lower', 'Adjust HSV Mask')
         s_upper = cv2.getTrackbarPos('S Upper', 'Adjust HSV Mask')
         v_lower = cv2.getTrackbarPos('V Lower', 'Adjust HSV Mask')
         v_upper = cv2.getTrackbarPos('V Upper', 'Adjust HSV Mask')
 
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, (0, s_lower, v_lower), (180, s_upper, v_upper))
+        mask = cv2.inRange(hsv, (h_lower, s_lower, v_lower), (h_upper, s_upper, v_upper))
         cv2.imshow('Adjust HSV Mask', mask)
 
         if cv2.waitKey(10) == 27:  # Esc key to quit
             break
 
     cv2.destroyWindow('Adjust HSV Mask')
-    return s_lower, s_upper, v_lower, v_upper
+    lower_hsv = np.array((h_lower, s_lower, v_lower))
+    upper_hsv = np.array((h_upper, s_upper, v_upper))
+    return lower_hsv, upper_hsv
 
 
-def calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper):
+def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     roi_hists = []
     for roi in rois:
@@ -41,9 +47,7 @@ def calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper):
         hsv_roi = hsv[y:y+h, x:x+w]
 
         # apply mask with all h values and user-defined s and v thresholds
-        mask = cv2.inRange(hsv_roi,
-                           np.array((0., float(s_lower), float(v_lower))),
-                           np.array((180., float(s_upper), float(v_upper))))
+        mask = cv2.inRange(hsv_roi, lower_hsv, upper_hsv)
 
         # construct a histogram of hue and saturation values and normalize it
         roi_hist = cv2.calcHist([hsv_roi],
@@ -238,7 +242,7 @@ def main():
     frame[indices] = field_color
 
     # interactive HSV mask adjustment
-    s_lower, s_upper, v_lower, v_upper = adjust_hsv_mask(frame)
+    lower_hsv, upper_hsv = adjust_hsv_mask(frame)
 
     rois = select_user_rois(frame)
     if len(rois) == 0:
@@ -272,7 +276,7 @@ def main():
         frame[indices] = field_color
         
         # calculate histograms for ROI
-        roi_hists = calc_histogram_rois(frame, rois, s_lower, s_upper, v_lower, v_upper)
+        roi_hists = calc_histogram_rois(frame, rois, lower_hsv, upper_hsv)
 
         rois, players, debug_show = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, last_positions, dt)
         
