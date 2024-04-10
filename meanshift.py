@@ -131,8 +131,8 @@ if __name__ == "__main__":
         show = field # cv2.resize(field, (frame.shape[1]//2, frame.shape[0]//2))
         cv2.imshow('dst', dst)
         # save the frame
-        cv2.imwrite(f'./result/frame_{image_idx}.png', show)
-        image_idx += 1
+        # cv2.imwrite(f'./result/frame_{image_idx}.png', show)
+        # image_idx += 1
 
         # Applying meanshift to get the new region
         for i, track_window in enumerate(track_windows):

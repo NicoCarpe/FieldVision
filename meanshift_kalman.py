@@ -114,7 +114,7 @@ def combine_backprojections_in_grid(bp_images, frame):
     return combined_bp
 
 
-def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, dt):
+def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, field_mask):
     players = []
     img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
     
@@ -134,7 +134,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         img_bp = cv2.calcBackProject([img_hsv], [0, 1], roi_hist, [0, 180, 0, 255], 1)
 
        # Apply Meanshift using updated ROI
-        ret, new_roi = cv2.meanShift(img_bp, roi, termination)
+        ret, new_roi = cv2.meanShift(field_mask, roi, termination)
         rois[i] = new_roi
         x, y, w, h = new_roi
         center = np.array([x + (w / 2), y + (h / 2)], np.float32)
@@ -190,8 +190,8 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
 
 def main():
     fps = 60
-    dt = 1 / fps
-    cap = cv2.VideoCapture("./assets/doubles_clip2.mp4")
+    dt = 1 #/ fps
+    cap = cv2.VideoCapture("./assets/doubles_clip.mp4")
     ret, frame = cap.read()
     if not ret:
         print("Failed to grab initial frame. Exiting.")
@@ -210,6 +210,10 @@ def main():
     src_pts = select_points(frame, 4)
     dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
+
+    # Background subtractor
+    backSub = cv2.createBackgroundSubtractorMOG2()
+    backSub.apply(frame)
     
     # calculate histograms for ROI
     roi_hists = calc_histogram_rois(frame, rois)
@@ -226,9 +230,17 @@ def main():
             break
 
         frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+
+        # Apply background subtraction
+        field_mask = backSub.apply(frame)
+        field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
+        _, field_mask = cv2.threshold(field_mask, 230, 255, 0)
+        field_mask = cv2.dilate(field_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), iterations=1) # dilate
+
+        # Apply mask to the frame
+        field = cv2.bitwise_and(frame, frame, mask=field_mask)
         
-        
-        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, dt)
+        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, field_mask)
         
         transform_and_draw_points_on_court(players, H, tennis_court)
         
