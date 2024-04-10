@@ -1,8 +1,5 @@
 # gitignore file
 
 __pycache__/
-results/
-test*.py
-*.mp4
-!singles*.mp4
-!doubles_clip.mp4
+outputs/*
+assets/*

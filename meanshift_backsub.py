@@ -1,7 +1,7 @@
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-from DLT import select_points, estimate_homography, apply_homography
+from utils.DLT import select_points, estimate_homography, apply_homography
 
 # Function to initialize MeanShift tracking with user-selected ROI
 def select_user_rois(frame):
@@ -11,7 +11,7 @@ def select_user_rois(frame):
 
     # returns a list of tuples, each representing an roi in (x, y, w, h) format
     return rois
-
+"""
 def crop_field_from_frame(frame):
 
     # create a mask for the tennis field
@@ -29,7 +29,7 @@ def crop_field_from_frame(frame):
     indices = np.all(frame == [0, 0, 0], axis=-1)
     frame[indices] = field_color
 
-    return frame, indices, field_color
+    return frame, indices, field_color"""
 
 def transform_and_draw_points_on_court(players, H, tennis_court):
     new_points = cv2.perspectiveTransform(np.array([players], dtype=np.float32), H)
@@ -74,9 +74,9 @@ if __name__ == "__main__":
     _, frame = cap.read()
     frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
 
-    # Crop the field from the frame
+    """  # Crop the field from the frame
     frame, indices, field_color = crop_field_from_frame(frame)
-
+    """
 
     # Variables to store ROI coordinates and flags
     track_windows = select_user_rois(frame)
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
         if frame is None:
             break
-        frame[indices] = field_color
+        #frame[indices] = field_color
         
         # Apply background subtraction
         field_mask = backSub.apply(frame)
