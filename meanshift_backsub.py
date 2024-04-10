@@ -11,7 +11,7 @@ def select_user_rois(frame):
 
     # returns a list of tuples, each representing an roi in (x, y, w, h) format
     return rois
-"""
+
 def crop_field_from_frame(frame):
 
     # create a mask for the tennis field
@@ -29,7 +29,7 @@ def crop_field_from_frame(frame):
     indices = np.all(frame == [0, 0, 0], axis=-1)
     frame[indices] = field_color
 
-    return frame, indices, field_color"""
+    return frame, indices, field_color
 
 def transform_and_draw_points_on_court(players, H, tennis_court):
     new_points = cv2.perspectiveTransform(np.array([players], dtype=np.float32), H)
@@ -56,7 +56,6 @@ def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
 
         # construct a histogram of hue and saturation values and normalize it
         roi_hist = cv2.calcHist([hsv_roi], [0], mask, [180], [0, 180])
-
         
         cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
         print(roi_hist.shape)
@@ -74,9 +73,8 @@ if __name__ == "__main__":
     _, frame = cap.read()
     frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
 
-    """  # Crop the field from the frame
+    # Crop the field from the frame
     frame, indices, field_color = crop_field_from_frame(frame)
-    """
 
     # Variables to store ROI coordinates and flags
     track_windows = select_user_rois(frame)
@@ -102,7 +100,7 @@ if __name__ == "__main__":
     backSub.apply(frame)
 
     # Initialize the histogram
-    roi_hists = calc_histogram_rois(frame, track_windows, np.array([0, 0, 0]), np.array([180, 255, 255]))
+    roi_hists = calc_histogram_rois(frame, track_windows, np.array([20, 0, 0]), np.array([180, 255, 255])) # 20 for the color orange
 
     players = [[0,0], [0,0]]
     image_idx = 0
@@ -111,12 +109,12 @@ if __name__ == "__main__":
         frame = cv2.resize(frame, (frame.shape[1]//2, frame.shape[0]//2))
         if frame is None:
             break
-        #frame[indices] = field_color
+        frame[indices] = field_color
         
         # Apply background subtraction
         field_mask = backSub.apply(frame)
         field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
-        _, field_mask = cv2.threshold(field_mask, 210, 255, 0)
+        _, field_mask = cv2.threshold(field_mask, 200, 255, 0)
         field_mask = cv2.dilate(field_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), iterations=1) # dilate
 
         # Apply mask to the frame
@@ -132,10 +130,7 @@ if __name__ == "__main__":
 
         # debug
         show = field # cv2.resize(field, (frame.shape[1]//2, frame.shape[0]//2))
-        cv2.imshow('dst', show)
-        # save the frame
-        # cv2.imwrite(f'./result/frame_{image_idx}.png', hsv)
-        # image_idx += 1
+        cv2.imshow('dst', dst)
 
         # Applying meanshift to get the new region
         for i, track_window in enumerate(track_windows):
