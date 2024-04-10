@@ -1,4 +1,5 @@
 import cv2
+from matplotlib import pyplot as plt
 import numpy as np
 from DLT import select_points, estimate_homography, apply_homography
 
@@ -39,6 +40,31 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
 
     return radar
 
+def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    roi_hists = []
+    for roi in rois:
+        # extract the ROI coordinates
+        x, y, w, h = roi  
+
+        # use ROI coordinates to crop the relevant region from the HSV image
+        hsv_roi = hsv[y:y+h, x:x+w]
+        cv2.imshow('hsv_roi', hsv_roi)
+
+        # apply mask with all h values and user-defined s and v thresholds
+        mask = cv2.inRange(hsv_roi, lower_hsv, upper_hsv)
+
+        # construct a histogram of hue and saturation values and normalize it
+        roi_hist = cv2.calcHist([hsv_roi], [0], mask, [180], [0, 180])
+
+        
+        cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
+        print(roi_hist.shape)
+
+        roi_hists.append(roi_hist)
+
+    return roi_hists
+
 
 if __name__ == "__main__":
     # Read video
@@ -75,6 +101,9 @@ if __name__ == "__main__":
     backSub = cv2.createBackgroundSubtractorMOG2()
     backSub.apply(frame)
 
+    # Initialize the histogram
+    roi_hists = calc_histogram_rois(frame, track_windows, np.array([0, 0, 0]), np.array([180, 255, 255]))
+
     players = [[0,0], [0,0]]
     image_idx = 0
     while True:
@@ -87,24 +116,31 @@ if __name__ == "__main__":
         # Apply background subtraction
         field_mask = backSub.apply(frame)
         field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
-        _, field_mask = cv2.threshold(field_mask, 230, 255, 0)
+        _, field_mask = cv2.threshold(field_mask, 210, 255, 0)
         field_mask = cv2.dilate(field_mask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)), iterations=1) # dilate
 
         # Apply mask to the frame
         field = cv2.bitwise_and(frame, frame, mask=field_mask)
         # cv2.imwrite('field_mask.png', field)
 
+        # Convert BGR to HSV format COLOR_BGR2HSV
+        hsv = cv2.cvtColor(field, cv2.COLOR_BGR2HSV)
+        dsts = []
+        for i, roi_hist in enumerate(roi_hists):
+            dst = cv2.calcBackProject([hsv], [0], roi_hist, [0, 180], 1)
+            dsts.append(dst)
+
         # debug
         show = field # cv2.resize(field, (frame.shape[1]//2, frame.shape[0]//2))
-        cv2.imshow('show', show)
+        cv2.imshow('dst', show)
         # save the frame
-        # cv2.imwrite(f'./result/frame_{image_idx}.png', show)
+        # cv2.imwrite(f'./result/frame_{image_idx}.png', hsv)
         # image_idx += 1
 
         # Applying meanshift to get the new region
         for i, track_window in enumerate(track_windows):
-            print(track_window)
-            _, track_windows[i] = cv2.meanShift(field_mask, track_window, termination) # meanshift
+            # print(track_window)
+            _, track_windows[i] = cv2.meanShift(dsts[i], track_window, termination) # meanshift
 
             # Draw track window on the frame
             x, y, w, h = track_windows[i]
