@@ -95,13 +95,13 @@ if __name__ == "__main__":
     termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 15, 2)
 
     # Background subtractor
-    backSub = cv2.createBackgroundSubtractorMOG2()
+    backSub = cv2.createBackgroundSubtractorKNN()
     backSub.apply(frame)
 
     # Initialize the histogram
     roi_hists = calc_histogram_rois(frame, track_windows, np.array([20, 0, 0]), np.array([180, 255, 255])) # 20 for the color orange
 
-    players = [[0,0], [0,0]]
+    players = [[0,0], [0,0], [0,0], [0,0]]
     image_idx = 0
     while True:
         _, frame = cap.read()
