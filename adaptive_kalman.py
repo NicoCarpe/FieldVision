@@ -146,6 +146,7 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
         cv2.circle(radar, (int(x), int(y)), 5, (0, 0, 255), -1)
     cv2.imshow('Radar', radar)
 
+    return radar
 
 def main():
     fps = 30.0
@@ -175,8 +176,10 @@ def main():
 
     termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 25, 2)
     
-    kalman_filters = initialize_kalman_filters(rois, fps)
+    kalman_filters = initialize_kalman_filters(rois, dt)
     
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter('outputs/output.mp4', fourcc, fps, (frame.shape[1], frame.shape[0]))
     
     while cap.isOpened():
         ret, frame = cap.read()
@@ -187,11 +190,19 @@ def main():
         
         rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub)
         
-        transform_and_draw_points_on_court(players, H, tennis_court)
+        radar = transform_and_draw_points_on_court(players, H, tennis_court)
         
         if cv2.waitKey(10) == 27:  # Esc key to quit
             break
+        
+        # minimize the radar to fit the video
+        radar = cv2.resize(radar, (radar.shape[1]//2, radar.shape[0]//2))
+        # overlay the radar on the video
+        frame[0:radar.shape[0], 0:radar.shape[1]] = radar
 
+        out.write(frame)
+    
+    out.release()
     cap.release()
     cv2.destroyAllWindows()
 
