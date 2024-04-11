@@ -112,7 +112,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     players = []
     bp_images = []
 
-     # Apply background subtraction
+    # Apply background subtraction
     field_mask = back_sub.apply(frame)
     field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
     _, field_mask = cv2.threshold(field_mask, 230, 255, 0)
