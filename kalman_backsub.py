@@ -59,7 +59,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     players = []
     img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
 
-     # Apply background subtraction
+    # Apply background subtraction
     field_mask = back_sub.apply(frame)
     field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
     _, field_mask = cv2.threshold(field_mask, 230, 255, 0)
