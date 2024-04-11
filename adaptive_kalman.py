@@ -4,9 +4,6 @@ from utils.DLT import select_points, estimate_homography
 from utils.KalmanFilter import AdaptiveKalmanFilter 
 from utils.homography import get_line
 
-mid_point = None
-team_1 = []
-team_2 = []
 
 def select_user_rois(frame):
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
@@ -28,10 +25,10 @@ def initialize_kalman_filters(rois, dt):
         measurement_matrix = np.array([[1, 0, 0, 0], 
                                        [0, 1, 0, 0]], np.float32)
         
-        process_noise_cov = np.array([[0.005, 0, 0, 0], 
-                                      [0, 0.005, 0, 0], 
-                                      [0, 0, 0.05, 0], 
-                                      [0, 0, 0, 0.05]], np.float32)
+        process_noise_cov = np.array([[0.002, 0, 0, 0], 
+                                      [0, 0.002, 0, 0], 
+                                      [0, 0, 0.02, 0], 
+                                      [0, 0, 0, 0.02]], np.float32)
         
         measurement_noise_cov = np.array([[0.2, 0], 
                                           [0, 0.2]], np.float32)
@@ -87,7 +84,7 @@ def constrain_to_frame(roi, frame_dimensions):
     return (x, y, w, h)
 
 
-def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub):
+def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub, mid_point, team_1, team_2):
     players = []
     frame_dimensions = (frame.shape[1], frame.shape[0])
     
@@ -96,9 +93,6 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
     _, field_mask = cv2.threshold(field_mask, 230, 255, 0)
     field_mask = cv2.dilate(field_mask, None, iterations=2) 
-
-    # Apply mask to the frame
-    #field = cv2.bitwise_and(frame, frame, mask=field_mask)
 
     for i, roi in enumerate(rois):
         prev_x, prev_y, prev_w, prev_h = roi
@@ -130,8 +124,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         # store player positions (we want the marker to be at the bottom of their feet)
         player_location = (int(center[0]), int(center[1]) + (h / 2))
         player_prev_location = (int(prev_center[0]), int(prev_center[1]) + (prev_h / 2))
-        # print(player_location, player_prev_location)
-        # print(mid_point)
+        
         
         if mid_point is not None:
             if i in team_1 and player_location[1] < mid_point[1]:
@@ -139,7 +132,6 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
             elif i in team_2 and player_location[1] > mid_point[1]:
                 players.append(player_location)
             else:
-                print(f"Player {i} out of bounds")
                 rois[i] = (prev_x, prev_y, prev_w, prev_h)
                 new_roi = roi
                 x, y, w, h = new_roi
@@ -173,10 +165,11 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
                                 int(prediction[1] + (0.5 * h))), 
                                 (0, 255, 0), 
                                 2)
-        # draw net line
-        if mid_point is not None:
-            length = 300
-            cv2.line(frame, (int(mid_point[0] - length), int(mid_point[1])), (int(mid_point[0] + length), int(mid_point[1])), (0, 0, 255), 2)
+        
+        # For Debugging: draw net line
+        # if mid_point is not None:
+        #     length = 300
+        #     cv2.line(frame, (int(mid_point[0] - length), int(mid_point[1])), (int(mid_point[0] + length), int(mid_point[1])), (0, 0, 255), 2)
         
     # show field mask and tracking window
     cv2.imshow("background subtraction", field_mask)
@@ -186,46 +179,50 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
 
 
 def transform_and_draw_points_on_court(players, H, tennis_court):
-    new_points = cv2.perspectiveTransform(np.array([players], dtype=np.float32), H)
-    radar = tennis_court.copy()
-    for x, y in new_points[0]:
-        cv2.circle(radar, (int(x), int(y)), 5, (0, 0, 255), -1)
-    cv2.imshow('Radar', radar)
+    # Define a list of distinct colors for the players
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+    
+    for i, player in enumerate(players):
+        # Apply the homography to transform the player's position to the court's perspective
+        transformed_pos = cv2.perspectiveTransform(np.array([[player]], dtype=np.float32), H)
+        # Choose a color for the player based on their index
+        color = colors[i % len(colors)]
+        # Draw the player's current position on the tennis court image
+        cv2.circle(tennis_court, (int(transformed_pos[0][0][0]), int(transformed_pos[0][0][1])), 2, color, -1)
+    
+    cv2.imshow('Radar', tennis_court)
 
-    return radar
+    return tennis_court
 
 def main():
-    global mid_point
-    global team_1
-    global team_2
-
     fps = 30.0
     dt = 1 / fps
 
-    cap = cv2.VideoCapture("assets/doubles_clip2.mp4") 
+    cap = cv2.VideoCapture("assets/doubles_clip3.mp4") 
     
     _, frame = cap.read()
-    print(frame.shape)
     width, height = 960, 540
     frame = cv2.resize(frame, (width, height))
 
     rois = select_user_rois(frame)
 
-    if len(rois) == 0:
-        print("No ROI selected. Exiting.")
-        return
-    elif len(rois) == 4:
+    # Decide teams based on the number of ROIs selected
+    if len(rois) == 4:
         team_1 = [0, 1]
         team_2 = [2, 3]
     elif len(rois) == 2:
         team_1 = [0]
         team_2 = [1]
+    else:
+        team_1, team_2 = [], []
     
     tennis_court = cv2.imread('./assets/tennis_court_background.png')
-    tennis_court = cv2.resize(tennis_court, (tennis_court.shape[1] // 6, tennis_court.shape[0] // 6))
+    scale_factor = height / tennis_court.shape[0]
+    new_width = int(tennis_court.shape[1] * scale_factor)
+    tennis_court = cv2.resize(tennis_court, (new_width, height))
+
     
     src_pts = select_points(frame, 4)
-    print(src_pts)
     dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
     
@@ -246,8 +243,11 @@ def main():
     
     kalman_filters = initialize_kalman_filters(rois, dt)
     
+    # Prepare for combined video output
+    output_width = width + tennis_court.shape[1]  # combine the frame and court widths
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter('outputs/output.mp4', fourcc, fps, (frame.shape[1], frame.shape[0]))
+    out = cv2.VideoWriter('outputs/output.mp4', fourcc, fps, (output_width, height))
+    
     
     while cap.isOpened():
         ret, frame = cap.read()
@@ -256,19 +256,17 @@ def main():
 
         frame = cv2.resize(frame, (width, height))
         
-        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub)
+        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub, mid_point, team_1, team_2)
         
-        radar = transform_and_draw_points_on_court(players, H, tennis_court)
+        transform_and_draw_points_on_court(players, H, tennis_court)
         
+        # Combine frame and tennis_court_resized for side-by-side output
+        combined_frame = np.hstack((frame, tennis_court))
+        
+        out.write(combined_frame)
+
         if cv2.waitKey(10) == 27:  # Esc key to quit
             break
-        
-        # minimize the radar to fit the video
-        radar = cv2.resize(radar, (radar.shape[1]//2, radar.shape[0]//2))
-        # overlay the radar on the video
-        frame[0:radar.shape[0], 0:radar.shape[1]] = radar
-
-        out.write(frame)
     
     out.release()
     cap.release()
