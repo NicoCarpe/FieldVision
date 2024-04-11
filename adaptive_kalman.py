@@ -5,6 +5,8 @@ from utils.KalmanFilter import AdaptiveKalmanFilter
 from utils.homography import get_line
 
 mid_point = None
+team_1 = []
+team_2 = []
 
 def select_user_rois(frame):
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
@@ -132,9 +134,9 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         # print(mid_point)
         
         if mid_point is not None:
-            if (i == 0 or i == 1) and player_location[1] < mid_point[1]:
+            if i in team_1 and player_location[1] < mid_point[1]:
                 players.append(player_location)
-            elif (i == 2 or i == 3) and player_location[1] > mid_point[1]:
+            elif i in team_2 and player_location[1] > mid_point[1]:
                 players.append(player_location)
             else:
                 print(f"Player {i} out of bounds")
@@ -194,10 +196,13 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
 
 def main():
     global mid_point
+    global team_1
+    global team_2
+
     fps = 30.0
     dt = 1 / fps
 
-    cap = cv2.VideoCapture("assets/doubles_clip3.mp4") 
+    cap = cv2.VideoCapture("assets/doubles_clip2.mp4") 
     
     _, frame = cap.read()
     print(frame.shape)
@@ -209,7 +214,13 @@ def main():
     if len(rois) == 0:
         print("No ROI selected. Exiting.")
         return
-
+    elif len(rois) == 4:
+        team_1 = [0, 1]
+        team_2 = [2, 3]
+    elif len(rois) == 2:
+        team_1 = [0]
+        team_2 = [1]
+    
     tennis_court = cv2.imread('./assets/tennis_court_background.png')
     tennis_court = cv2.resize(tennis_court, (tennis_court.shape[1] // 6, tennis_court.shape[0] // 6))
     
