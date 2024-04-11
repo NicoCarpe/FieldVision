@@ -24,10 +24,10 @@ def initialize_kalman_filters(rois, dt):
         measurement_matrix = np.array([[1, 0, 0, 0], 
                                        [0, 1, 0, 0]], np.float32)
         
-        process_noise_cov = np.array([[0.002, 0, 0, 0], 
-                                      [0, 0.002, 0, 0], 
-                                      [0, 0, 0.02, 0], 
-                                      [0, 0, 0, 0.02]], np.float32)
+        process_noise_cov = np.array([[0.005, 0, 0, 0], 
+                                      [0, 0.005, 0, 0], 
+                                      [0, 0, 0.05, 0], 
+                                      [0, 0, 0, 0.05]], np.float32)
         
         measurement_noise_cov = np.array([[0.2, 0], 
                                           [0, 0.2]], np.float32)
@@ -50,18 +50,18 @@ def initialize_kalman_filters(rois, dt):
     return kalman_filters
 
 
-def bbox_overlap(box1, box2):
-    x_left = max(box1[0], box2[0])
-    y_top = max(box1[1], box2[1])
-    x_right = min(box1[0] + box1[2], box2[0] + box2[2])
-    y_bottom = min(box1[1] + box1[3], box2[1] + box2[3])
+def roi_overlap(roi1, roi2):
+    x_left = max(roi1[0], roi2[0])
+    y_top = max(roi1[1], roi2[1])
+    x_right = min(roi1[0] + roi1[2], roi2[0] + roi2[2])
+    y_bottom = min(roi1[1] + roi1[3], roi2[1] + roi2[3])
 
     if x_right < x_left or y_bottom < y_top:
         return 0.0
 
     overlap_area = (x_right - x_left) * (y_bottom - y_top)
-    box1_area = box1[2] * box1[3]
-    return overlap_area / box1_area
+    roi1_area = roi1[2] * roi1[3]
+    return overlap_area / roi1_area
 
 
 def calculate_alpha(field_mask, roi):
@@ -72,9 +72,21 @@ def calculate_alpha(field_mask, roi):
     return filled_pixels / total_pixels if total_pixels > 0 else 0
 
 
+def constrain_to_frame(roi, frame_dimensions):
+    x, y, w, h = roi
+    frame_width, frame_height = frame_dimensions
+
+    # Ensure the ROI does not go beyond the frame boundary
+    x = max(0, min(x, frame_width - w))
+    y = max(0, min(y, frame_height - h))
+
+    return (x, y, w, h)
+
+
 def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub):
     players = []
-
+    frame_dimensions = (frame.shape[1], frame.shape[0])
+    
     # Apply background subtraction
     field_mask = back_sub.apply(frame)
     field_mask = cv2.GaussianBlur(field_mask, (5, 5), 0)
@@ -94,6 +106,9 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         pred_x, pred_y = int(prediction[0]), int(prediction[1])
         updated_roi = (pred_x - roi[2] // 2, pred_y - roi[3] // 2, roi[2], roi[3])
 
+        # Constrain the updated ROI before applying MeanShift
+        updated_roi = constrain_to_frame(updated_roi, frame_dimensions)
+
         # Apply MeanShift using updated ROI
         ret, new_roi = cv2.meanShift(field_mask, updated_roi, termination)
         rois[i] = new_roi
@@ -107,7 +122,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         measured_y = y + h / 2
         measurement = np.array([measured_x, measured_y], np.float32)  
         
-        occluded = any(bbox_overlap(new_roi, other_roi) > 0.3 for j, other_roi in enumerate(rois) if i != j)
+        occluded = any(roi_overlap(new_roi, other_roi) > 0.4 for j, other_roi in enumerate(rois) if i != j)
         alpha = calculate_alpha(field_mask, new_roi)
         
         kf.adjust_for_occlusion(occluded)
@@ -152,7 +167,7 @@ def main():
     fps = 30.0
     dt = 1 / fps
 
-    cap = cv2.VideoCapture("assets/doubles_clip2.mp4") 
+    cap = cv2.VideoCapture("assets/doubles_clip3.mp4") 
     
     _, frame = cap.read()
     print(frame.shape)

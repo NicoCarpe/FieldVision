@@ -44,8 +44,8 @@ class AdaptiveKalmanFilter(KalmanFilter):
     def adjust_for_occlusion(self, occlusion_status):
         if occlusion_status:
             # Adjust parameters to rely more on the model predictions during occlusion
-            self.Q *= 0.1  # Increase model confidence
-            self.R *= 1e6  # Decrease measurement confidence
+            self.Q *= 0.1   # Increase model confidence
+            self.R *= 1e6   # Decrease measurement confidence
         else:
             # Reset parameters to default when no occlusion is detected
             self.Q = np.copy(self.default_Q)
