@@ -3,5 +3,8 @@
 __pycache__/
 outputs/*
 assets/*
+!assets/doubles_clip.mp4
 !assets/doubles_clip2.mp4
 !assets/doubles_clip3.mp4
+!assets/doubles_clip4.mp4
+!assets/doubles_clip5.mp4

@@ -152,10 +152,12 @@ def main():
     fps = 30.0
     dt = 1 / fps
 
-    cap = cv2.VideoCapture("assets/doubles_clip4.mp4") 
+    cap = cv2.VideoCapture("assets/doubles_clip2.mp4") 
     
     _, frame = cap.read()
-    frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+    print(frame.shape)
+    width, height = 960, 540
+    frame = cv2.resize(frame, (width, height))
 
     rois = select_user_rois(frame)
 
@@ -186,7 +188,7 @@ def main():
         if not ret:
             break
 
-        frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
+        frame = cv2.resize(frame, (width, height))
         
         rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub)
         
