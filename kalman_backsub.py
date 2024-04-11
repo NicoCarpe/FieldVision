@@ -3,6 +3,31 @@ import numpy as np
 from utils.DLT import select_points, estimate_homography
 
 
+def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    roi_hists = []
+    for roi in rois:
+        # extract the ROI coordinates
+        x, y, w, h = roi  
+
+        # use ROI coordinates to crop the relevant region from the HSV image
+        hsv_roi = hsv[y:y+h, x:x+w]
+        cv2.imshow('hsv_roi', hsv_roi)
+
+        # apply mask with all h values and user-defined s and v thresholds
+        mask = cv2.inRange(hsv_roi, lower_hsv, upper_hsv)
+
+        # construct a histogram of hue and saturation values and normalize it
+        roi_hist = cv2.calcHist([hsv_roi], [0], mask, [180], [0, 180])
+        
+        cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
+        print(roi_hist.shape)
+
+        roi_hists.append(roi_hist)
+
+    return roi_hists
+
+
 def select_user_rois(frame):
     # user selects the ROIs in the first frame
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
@@ -55,9 +80,37 @@ def initialize_kalman_filters(rois, dt):
     return kalman_filters
 
 
-def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub):
+def combine_backprojections_in_grid(bp_images, frame):
+    # Determine the maximum width and height of the backprojection images
+    max_width = max(bp.shape[1] for bp in bp_images)
+    max_height = max(bp.shape[0] for bp in bp_images)
+    
+    # Calculate the number of images per row and per column to fit them in a grid
+    num_images = len(bp_images)
+    num_columns = int(np.ceil(np.sqrt(num_images)))
+    num_rows = int(np.ceil(num_images / num_columns))
+    
+    # Create a blank canvas to place the backprojection images
+    grid_height = max_height * num_rows
+    grid_width = max_width * num_columns
+    combined_bp = np.zeros((grid_height, grid_width), dtype=np.uint8)
+
+    # Position each backprojection image in the grid
+    for i, bp in enumerate(bp_images):
+        row = i // num_columns
+        col = i % num_columns
+        start_y = row * max_height
+        start_x = col * max_width
+        combined_bp[start_y:start_y + bp.shape[0], start_x:start_x + bp.shape[1]] = bp
+
+    # Resize the combined backprojections to fit the original frame size, if necessary
+    if combined_bp.shape[0] > frame.shape[0] or combined_bp.shape[1] > frame.shape[1]:
+        combined_bp = cv2.resize(combined_bp, (frame.shape[1], frame.shape[0]))
+    
+    return combined_bp
+def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, back_sub):
     players = []
-    img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
+    bp_images = []
 
      # Apply background subtraction
     field_mask = back_sub.apply(frame)
@@ -67,9 +120,13 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
 
     # Apply mask to the frame
     field = cv2.bitwise_and(frame, frame, mask=field_mask)
+    cv2.imshow("field", field)
+
+    img_hsv = cv2.cvtColor(field, cv2.COLOR_BGR2HSV) 
 
     for i, roi in enumerate(rois):
         kf = kalman_filters[i]
+        roi_hist = roi_hists[i]
 
         # Prediction using Kalman filter
         prediction = kf.predict()
@@ -78,8 +135,10 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         pred_x, pred_y = int(prediction[0]), int(prediction[1])
         roi = (pred_x - roi[2] // 2, pred_y - roi[3] // 2, roi[2], roi[3])
 
+        img_bp = cv2.calcBackProject([img_hsv], [0, 1], roi_hist, [0, 180, 0, 255], 1)
+
        # Apply Meanshift using updated ROI
-        ret, new_roi = cv2.meanShift(field_mask, roi, termination)
+        ret, new_roi = cv2.meanShift(img_bp, roi, termination)
         rois[i] = new_roi
         x, y, w, h = new_roi
         center = np.array([x + (w / 2), y + (h / 2)], np.float32)
@@ -111,9 +170,14 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
                              (0, 255, 0),
                               2)
 
-    
-    # show field mask and tracking window
-    cv2.imshow("background subtraction", field)
+        img_bp = cv2.calcBackProject([img_hsv], [0, 1], roi_hists[i], [0, 180, 0, 255], 1)
+        bp_images.append(img_bp)
+
+    # After the loop, combine the backprojections in a grid
+    combined_bp = combine_backprojections_in_grid(bp_images, frame)
+
+    # Show the combined backprojections
+    cv2.imshow("Combined Backprojections", combined_bp)
     cv2.imshow("Tracking Window", frame)
     
     return rois, players
@@ -151,11 +215,13 @@ def main():
     dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
 
+    # calculate histograms for ROI
+    roi_hists = calc_histogram_rois(frame, rois, np.array([20, 0, 0]), np.array([180, 255, 255]))
+
     # Background subtractor
     back_sub = cv2.createBackgroundSubtractorMOG2()
     back_sub.apply(frame)
     
-
     # possibly look at interatively increasing the search window if there is poor matching
     # or implementing a pyramidal update on top
     termination = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 25, 2)
@@ -169,7 +235,7 @@ def main():
 
         frame = cv2.resize(frame, (frame.shape[1] // 2, frame.shape[0] // 2))
         
-        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub)
+        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, roi_hists, back_sub)
         
         transform_and_draw_points_on_court(players, H, tennis_court)
         
