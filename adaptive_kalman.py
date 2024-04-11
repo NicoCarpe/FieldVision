@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 from utils.DLT import select_points, estimate_homography
 from utils.KalmanFilter import AdaptiveKalmanFilter 
+from utils.homography import get_line
 
+mid_point = None
 
 def select_user_rois(frame):
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
@@ -85,6 +87,14 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     #field = cv2.bitwise_and(frame, frame, mask=field_mask)
 
     for i, roi in enumerate(rois):
+        prev_x, prev_y, prev_w, prev_h = roi
+        if i == 0 or i == 1:
+            prev_y -= 5
+        else:
+            prev_y += 5
+
+        prev_center = np.array([prev_x + (prev_w / 2), prev_y + (prev_h / 2)], np.float32)
+
         kf = kalman_filters[i]
 
         # Prediction using Kalman filter
@@ -101,7 +111,22 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         center = np.array([x + (w / 2), y + (h / 2)], np.float32)
         
         # store player positions (we want the marker to be at the bottom of their feet)
-        players.append((int(center[0]), int(center[1]) + (h / 2)))
+        player_location = (int(center[0]), int(center[1]) + (h / 2))
+        player_prev_location = (int(prev_center[0]), int(prev_center[1]) + (prev_h / 2))
+        # print(player_location, player_prev_location)
+        # print(mid_point)
+        
+        if mid_point is not None:
+            if (i == 0 or i == 1) and player_location[1] < mid_point[1]:
+                players.append(player_location)
+            elif (i == 2 or i == 3) and player_location[1] > mid_point[1]:
+                players.append(player_location)
+            else:
+                print(f"Player {i} out of bounds")
+                rois[i] = (prev_x, prev_y, prev_w, prev_h)
+                new_roi = roi
+                x, y, w, h = new_roi
+                players.append(player_prev_location)
 
         measured_x = x + w / 2
         measured_y = y + h / 2
@@ -131,6 +156,10 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
                                 int(prediction[1] + (0.5 * h))), 
                                 (0, 255, 0), 
                                 2)
+        # draw net line
+        if mid_point is not None:
+            length = 300
+            cv2.line(frame, (int(mid_point[0] - length), int(mid_point[1])), (int(mid_point[0] + length), int(mid_point[1])), (0, 0, 255), 2)
         
     # show field mask and tracking window
     cv2.imshow("background subtraction", field_mask)
@@ -149,6 +178,7 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
     return radar
 
 def main():
+    global mid_point
     fps = 30.0
     dt = 1 / fps
 
@@ -169,8 +199,18 @@ def main():
     tennis_court = cv2.resize(tennis_court, (tennis_court.shape[1] // 6, tennis_court.shape[0] // 6))
     
     src_pts = select_points(frame, 4)
+    print(src_pts)
     dst_pts = select_points(tennis_court.copy(), 4)
     H = estimate_homography(src_pts, dst_pts)
+    
+    homo_pts = np.concatenate((src_pts, np.ones([len(src_pts), 1])), axis=1) 
+    
+    l1 = get_line(homo_pts[0], homo_pts[2])
+    l2 = get_line(homo_pts[1], homo_pts[3])
+    
+    mid_point = np.cross(l1, l2)
+    mid_point = (mid_point / mid_point[2]).astype(np.int32)
+
 
     # Background subtractor
     back_sub = cv2.createBackgroundSubtractorKNN()
