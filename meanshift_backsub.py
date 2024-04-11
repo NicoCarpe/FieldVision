@@ -58,7 +58,6 @@ def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
         roi_hist = cv2.calcHist([hsv_roi], [0], mask, [180], [0, 180])
         
         cv2.normalize(roi_hist, roi_hist, 0, 255, cv2.NORM_MINMAX)
-        print(roi_hist.shape)
 
         roi_hists.append(roi_hist)
 
@@ -67,7 +66,7 @@ def calc_histogram_rois(frame, rois, lower_hsv, upper_hsv):
 
 if __name__ == "__main__":
     # Read video
-    cap = cv2.VideoCapture("./assets/singles_1.mp4")
+    cap = cv2.VideoCapture("./assets/doubles_clip2.mp4")
 
     # Retrieve the very first frame from the video
     _, frame = cap.read()
