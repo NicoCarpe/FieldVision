@@ -198,7 +198,7 @@ def main():
     fps = 30.0
     dt = 1 / fps
 
-    cap = cv2.VideoCapture("assets/doubles_clip3.mp4") 
+    cap = cv2.VideoCapture("assets/doubles_clip2.mp4") 
     
     _, frame = cap.read()
     width, height = 960, 540

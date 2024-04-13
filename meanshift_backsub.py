@@ -1,5 +1,4 @@
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
 from utils.DLT import select_points, estimate_homography, apply_homography
 

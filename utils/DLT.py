@@ -41,7 +41,7 @@ def estimate_homography(pts1, pts2):
 
     # Reshape
     H = V[-1].reshape(3, 3)
-    return H / np.linalg.norm(H)
+    return H / H[2, 2]
 
 def apply_homography(image, H):
     """
