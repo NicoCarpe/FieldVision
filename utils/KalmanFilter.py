@@ -53,8 +53,10 @@ class AdaptiveKalmanFilter(KalmanFilter):
 
     def dynamic_adjustment(self, confidence_level):
         # Adjusts the filter's parameters based on the detection confidence level.
-       
-        # Scale the Q and R matrices based on confidence. Lower confidence increases process noise, implying reliance on model.
-        alpha_scale = max(0.1, min(confidence_level, 1))
-        self.Q = self.default_Q * (1 / alpha_scale)
-        self.R = self.default_R * alpha_scale
+    
+        # Scale the Q and R matrices based on confidence. 
+        # Higher confidence decreases measurement noise more, implying more reliance on measurements.
+        # Lower confidence decreases process noise more, implying more reliance on the predictive model.
+        alpha_scale = max(0.01, min(confidence_level, 0.99))  
+        self.Q = self.default_Q * alpha_scale           # Decrease process noise less with higher confidence
+        self.R = self.default_R * (1 - alpha_scale)     # Decrease measurement noise more with higher confidence
