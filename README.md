@@ -11,14 +11,12 @@ FieldVision is a player-tracking system tailored for tennis analytics. It monito
 - **Adaptive Occlusion Handling with Kalman Filter:** Features an Adaptive Kalman Filter that dynamically adjusts its parameters based on detection conditions, such as occlusions and variable detection confidence, to ensure consistent and reliable tracking.
 - **Standardized Court Mapping via Homography:** Implements homography transformations to map the 2D player positions onto a standardized model of a tennis court, facilitating accurate and consistent analysis across different matches and camera angles.
 
-![Adaptive Kalman Filter and Meanshift tracking in action.](result_picture.png)
+![Adaptive Kalman Filter and Meanshift tracking in action.](assets/result_picture.png)
 
 ## Implementation Details
 
 The system starts by applying the Meanshift algorithm to detect initial player positions from video frames. These positions are refined using the Adaptive Kalman Filter, which adjusts to changes in player motion and occlusion dynamically. Finally, player coordinates are transformed to a standard tennis court using homography, allowing for precise strategic analysis.
 
-
-![Meanshift + Kalman filter tracking of doubles tennis.](result_picture.png)
 
 ## Sources
 Comaniciu, D., Ramesh, V., & Meer, P. (2000). Real-time tracking of non-rigid objects
