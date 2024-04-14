@@ -8,7 +8,7 @@ from utils.homography import get_line
 def select_user_rois(frame):
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
     cv2.destroyWindow('Select ROIs')
-    print(f"Selected ROIs: {rois}")
+    # print(f"Selected ROIs: {rois}")
     return rois
 
 
@@ -96,7 +96,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     field_mask = cv2.dilate(field_mask, None, iterations=2) 
 
     for i, roi in enumerate(rois):
-        print(f"Player {i+1} ROI: {roi}")
+        # print(f"Player {i+1} ROI: {roi}")
         prev_x, prev_y, prev_w, prev_h = roi
         if i == 0 or i == 1:
             prev_y -= 5
@@ -206,8 +206,9 @@ def transform_and_draw_points_on_court(players, H, tennis_court):
 def main():
     fps = 30.0
     dt = 1 / fps
+    clip_index = 4
 
-    cap = cv2.VideoCapture("assets/doubles_clip2.mp4") 
+    cap = cv2.VideoCapture(f"assets/doubles_clip{clip_index}.mp4") 
     
     _, frame = cap.read()
     width, height = 960, 540
@@ -263,7 +264,7 @@ def main():
     # Prepare for combined video output
     output_width = width + tennis_court.shape[1]  # combine the frame and court widths
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter('outputs/output.mp4', fourcc, fps, (output_width, height))
+    out = cv2.VideoWriter(f'results/output_{clip_index}.mp4', fourcc, fps, (output_width, height))
     
     i = 0
     while cap.isOpened():
@@ -278,7 +279,7 @@ def main():
         transform_and_draw_points_on_court(players, H, tennis_court)
 
         # save the frame as image
-        cv2.imwrite(f'outputs/frame_{i}.jpg', frame)
+        # cv2.imwrite(f'outputs/frame_{i}.jpg', frame)
         i += 1
         
         # Combine frame and tennis_court_resized for side-by-side output
