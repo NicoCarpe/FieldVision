@@ -4,8 +4,9 @@
 
 FieldVision is a player-tracking system tailored for tennis analytics. It monitors player movements, while handling occlusions, and maps player positions onto a top-down view of a tennis court. The system employs the Meanshift algorithm for initial player detection, an Adaptive Kalman Filter for dynamic adjustments during tracking, and homography transformations for mapping onto our top-down view.
 
-
-![Adaptive Kalman Filter and Meanshift tracking in action.](assets/results_picture.png)
+<p align="center">
+  <img src="https://github.com/NicoCarpe/FieldVision/edit/main/results/output_3.mp4" alt="animated" />
+</p>
 
 
 ### Key Features
