@@ -84,9 +84,8 @@ def constrain_to_frame(roi, frame_dimensions):
     return (x, y, w, h)
 
 
-def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub, mid_point, team_1, team_2, prev_predicts):
+def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub, mid_point, team_1, team_2):
     players = []
-    predictions = [None] * len(rois)
     frame_dimensions = (frame.shape[1], frame.shape[0])
     
     # Apply background subtraction
@@ -106,8 +105,11 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
 
         kf = kalman_filters[i]
 
+        # Prediction using Kalman filter
+        prediction = kf.predict()
+
         # Update ROI based on prediction for Meanshift initialization
-        pred_x, pred_y = int(prev_predicts[i][0]), int(prev_predicts[i][1])
+        pred_x, pred_y = int(prediction[0]), int(prediction[1])
         updated_roi = (pred_x - roi[2] // 2, pred_y - roi[3] // 2, roi[2], roi[3])
 
         # Constrain the updated ROI before applying MeanShift
@@ -139,7 +141,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         measured_y = y + h / 2
         measurement = np.array([measured_x, measured_y], np.float32)  
         
-        occluded = any(roi_overlap(new_roi, other_roi) > 0.30 for j, other_roi in enumerate(rois) if i != j)
+        occluded = any(roi_overlap(new_roi, other_roi) > 0.4 for j, other_roi in enumerate(rois) if i != j)
         alpha = calculate_alpha(field_mask, new_roi)
         
         kf.adjust_for_occlusion(occluded)
@@ -147,9 +149,6 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
 
         # Update the Kalman filter with the new measurement
         kf.update(measurement)
-
-        # Prediction using Kalman filter
-        predictions[i] = kf.predict()
 
         # draw new_roi on image - in BLUE
         frame = cv2.rectangle(frame,
@@ -160,10 +159,10 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
         
         # draw predicton on image - in GREEN
         frame = cv2.rectangle(  frame, 
-                                (int(predictions[i][0] - (0.5 * w)), 
-                                int(predictions[i][1] - (0.5 * h))), 
-                                (int(predictions[i][0] + (0.5 * w)), 
-                                int(predictions[i][1] + (0.5 * h))), 
+                                (int(prediction[0] - (0.5 * w)), 
+                                int(prediction[1] - (0.5 * h))), 
+                                (int(prediction[0] + (0.5 * w)), 
+                                int(prediction[1] + (0.5 * h))), 
                                 (0, 255, 0), 
                                 2)
         
@@ -176,7 +175,7 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     cv2.imshow("background subtraction", field_mask)
     cv2.imshow("Tracking Window", frame)
     
-    return rois, players, predictions
+    return rois, players
 
 
 def transform_and_draw_points_on_court(players, H, tennis_court):
@@ -244,6 +243,11 @@ def main():
     
     kalman_filters = initialize_kalman_filters(rois, dt)
 
+
+    # initialize our predictions with the chosen rois
+    prev_predicts = rois
+
+    
     # initialize our predictions with the chosen rois
     prev_predicts = rois
 
@@ -260,9 +264,8 @@ def main():
 
         frame = cv2.resize(frame, (width, height))
         
-        rois, players, predicts = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub, mid_point, team_1, team_2, prev_predicts)
+        rois, players = tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters, back_sub, mid_point, team_1, team_2)
         
-        prev_predicts = predicts
         transform_and_draw_points_on_court(players, H, tennis_court)
         
         # Combine frame and tennis_court_resized for side-by-side output
