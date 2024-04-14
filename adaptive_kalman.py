@@ -8,6 +8,7 @@ from utils.homography import get_line
 def select_user_rois(frame):
     rois = cv2.selectROIs('Select ROIs', frame, fromCenter=False, showCrosshair=False)
     cv2.destroyWindow('Select ROIs')
+    print(f"Selected ROIs: {rois}")
     return rois
 
 
@@ -25,13 +26,13 @@ def initialize_kalman_filters(rois, dt):
         measurement_matrix = np.array([[1, 0, 0, 0], 
                                        [0, 1, 0, 0]], np.float32)
         
-        process_noise_cov = np.array([[0.01, 0, 0, 0], 
-                                      [0, 0.01, 0, 0], 
-                                      [0, 0, 0.05, 0], 
-                                      [0, 0, 0, 0.05]], np.float32)
-        
-        measurement_noise_cov = np.array([[0.1, 0], 
-                                          [0, 0.1]], np.float32)
+        process_noise_cov = np.array([[0.002, 0, 0, 0], 
+                                      [0, 0.002, 0, 0], 
+                                      [0, 0, 0.02, 0], 
+                                      [0, 0, 0, 0.02]], np.float32)
+
+        measurement_noise_cov = np.array([[0.2, 0], 
+                                          [0, 0.2]], np.float32)
         
         error_cov_post = np.eye(4, dtype=np.float32)
 
@@ -96,11 +97,14 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
     field_mask = cv2.dilate(field_mask, None, iterations=2) 
 
     for i, roi in enumerate(rois):
+        print(f"Player {i+1} ROI: {roi}")
         prev_x, prev_y, prev_w, prev_h = roi
         if i == 0 or i == 1:
             prev_y -= 5
         else:
             prev_y += 5
+
+        player_index = i+1
 
         prev_center = np.array([prev_x + (prev_w / 2), prev_y + (prev_h / 2)], np.float32)
 
@@ -150,6 +154,11 @@ def tracking_with_meanshift_and_kalman(rois, frame, termination, kalman_filters,
 
         # Prediction using Kalman filter
         predictions[i] = kf.predict()
+
+        if player_index -1 in team_1:
+            cv2.putText(frame, f'Player {player_index}', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+        elif player_index-1 in team_2:
+            cv2.putText(frame, f'Player {player_index}', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # draw new_roi on image - in BLUE
         frame = cv2.rectangle(frame,
@@ -252,7 +261,7 @@ def main():
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter('outputs/output.mp4', fourcc, fps, (output_width, height))
     
-    
+    i = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -264,6 +273,10 @@ def main():
         
         prev_predicts = predicts
         transform_and_draw_points_on_court(players, H, tennis_court)
+
+        # save the frame as image
+        cv2.imwrite(f'outputs/frame_{i}.jpg', frame)
+        i += 1
         
         # Combine frame and tennis_court_resized for side-by-side output
         combined_frame = np.hstack((frame, tennis_court))
